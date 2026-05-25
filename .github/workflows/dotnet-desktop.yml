@@ -65,10 +65,10 @@ jobs:
         dotnet-version: 8.0.x
 
     - name: Restore dependencies
-      run: dotnet restore CybersecurityAwarenessChatbot.sln
+      run: dotnet restore CybersecurityAwarenessChatbot.slnx
 
     - name: Build solution
-      run: dotnet build CybersecurityAwarenessChatbot.sln --no-restore --configuration ${{ matrix.configuration }}
+      run: dotnet build CybersecurityAwarenessChatbot.slnx --no-restore --configuration ${{ matrix.configuration }}
 
     - name: Run tests
-      run: dotnet test CybersecurityAwarenessChatbot.Tests/CybersecurityAwarenessChatbot.Tests.csproj --no-build --configuration ${{ matrix.configuration }}
+      run: dotnet test --no-build --configuration ${{ matrix.configuration }}
