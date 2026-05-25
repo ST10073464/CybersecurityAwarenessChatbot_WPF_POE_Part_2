@@ -1,144 +1,275 @@
-﻿
-/*
+﻿/*
     Erwin Mashobane
     ST10073464
 */
+
 using System;
-using System.Collections;
-using System.Data;
+using System.Collections.Generic;
 
 namespace CybersecurityAwarenessChatbot.Classes
-
 {
-    
-    class ChatBot
+    // Main chatbot engine.
+    // Controls memory, sentiment, keyword recognition, and conversation flow.
+    public class ChatBot
     {
-        List<(string message, DateTime time)> conversationHistory = new List<(string, DateTime)>();
-        public string UserName { get; set; }
+        private readonly KeywordResponder keywordResponder;
+        private readonly SentimentDetector sentimentDetector;
+        private readonly MemoryStore memoryStore;
 
-        UIHelper ui = new UIHelper();
+        private readonly Random random;
 
-        VoicePlayer voice = new VoicePlayer();
+        private bool awaitingName = true;
 
-        Responses responses = new Responses();
+        private readonly List<string> fallbackResponses;
 
-        public void Start()
+        private string LastMatchedKeyword = "";
+
+        // Constructor
+        public ChatBot()
         {
-            // Show ASCII Logo
-            ui.ShowLogo();
+            keywordResponder = new KeywordResponder();
+            sentimentDetector = new SentimentDetector();
+            memoryStore = new MemoryStore();
 
-            // Play welcome audio
-            voice.PlayGreeting();
+            random = new Random();
 
-            AskUserName();
-
-            // Small pause for effect
-            Thread.Sleep(500);
-
-            //  welcome message
-            Console.WriteLine($"\nHey {UserName}! Welcome to SecureWin");
-
-            Console.WriteLine("\nYou can chat with me about staying safe online, including:");
-            Console.WriteLine("     Creating strong passwords");
-            Console.WriteLine("     Spotting phishing scams");
-            Console.WriteLine("     Safe and smart browsing");
-
-            Console.WriteLine("\nGo ahead and ask me anything related to online safety!\n");
-            Console.WriteLine("Type 'exit' anytime to quit.\n");
-
-            ChatLoop();
+            fallbackResponses = new List<string>
+            {
+                "I'm not sure I understand yet. Try asking about passwords, scams, or privacy.",
+                "Could you rephrase that? I can help with cybersecurity topics.",
+                "Ask me about phishing, malware, passwords, or online safety."
+            };
         }
 
-        void AskUserName()
+        // Initial greeting message
+        public string GetGreeting()
         {
-            Console.Write("Please enter your name: ");
-            UserName = Console.ReadLine();
-
-            while (string.IsNullOrWhiteSpace(UserName))
-            {
-                // warning message when user enters empty name
-                Console.WriteLine("Name cannot be empty. Please try again.");
-                UserName = Console.ReadLine();
-            }
-
-            // Trim spaces and capitalize first letter
-            UserName = UserName.Trim();
-            UserName = char.ToUpper(UserName[0]) + UserName.Substring(1).ToLower();
+            return "👋 Welcome to SecureWin!\n\nWhat is your name?";
         }
 
-        void ChatLoop()
+        // Main chatbot processing logic
+        public string ProcessInput(string input)
         {
-            string input = "";
+            input = input.ToLower().Trim();
 
-            while (true)
+            // CAPTURE USER NAME
+
+            if (awaitingName)
             {
+                string previousName = memoryStore.UserName;
 
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write("\nYou: ");
+                memoryStore.RememberUserName(input);
 
-                input = Console.ReadLine().ToLower();
-                //  Case-InsensitiveComparer handling
-                input = input.ToLower().Trim();
+                awaitingName = false;
 
-                if (string.IsNullOrWhiteSpace(input))
+                // Returning user
+                if (
+                    !string.IsNullOrEmpty(previousName) &&
+                    previousName.Equals(
+                        memoryStore.UserName,
+                        StringComparison.OrdinalIgnoreCase
+                    ) &&
+                    memoryStore.ConversationHistory.Count > 0
+                   )
                 {
-                    // Check for empty input and prompt user to enter a valid question
-                    Console.WriteLine("Bot: Please enter a valid question.");
-                    continue;
+                    string previousChats =
+                        string.Join(
+                            "\n",
+                            memoryStore.ConversationHistory
+                        );
+
+                    return $"👋 Welcome back, {memoryStore.UserName}!\n\n" +
+                           $"Here are your previous chats:\n\n" +
+                           $"{previousChats}";
                 }
 
-                // Exit condition
-                if (input == "exit")
-                {
-                    Console.Write("\nBot: Would you like to see your conversation before exiting? (yes/no): ");
-                    string choice = Console.ReadLine().ToLower().Trim();
-
-                    while (choice != "yes" && choice != "no")
-                    {
-                        Console.Write("Please type 'yes' or 'no': ");
-                        choice = Console.ReadLine().ToLower().Trim();
-                    }
-
-                    if (choice == "yes")
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("\n===== Conversation History =====\n");
-
-                        for (int i = 0; i < conversationHistory.Count; i++)
-                        {
-                            var entry = conversationHistory[i];
-
-                            string time = entry.time.ToString("HH:mm:ss");
-
-                            // Alternate colors for user & bot
-                            if (i % 2 == 0)
-                                Console.ForegroundColor = ConsoleColor.White;   // User
-                            else
-                                Console.ForegroundColor = ConsoleColor.Green;   // Bot
-
-                            Console.WriteLine($"[{time}] {entry.message}");
-                        }
-
-                        Console.WriteLine("\n================================");
-                        conversationHistory.Clear(); // clear history after displaying
-                    }
-
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"\nBot: Goodbye {UserName}! Stay safe online and keep winning");
-                    break;
-                }
-
-                // Get response from Responses class and display it     
-                Console.ForegroundColor = ConsoleColor.Green;
-                string botReply = responses.GetResponse(input);
-
-                conversationHistory.Add(("You: " + input, DateTime.Now));
-                conversationHistory.Add(("Bot: " + botReply, DateTime.Now));
-
-                Console.WriteLine("Bot: " + botReply);
+                return $"😊 Nice to meet you, {memoryStore.UserName}!\n\n" +
+                       $"You can ask me about:\n" +
+                       $"🔒 Passwords\n" +
+                       $"🎣 Phishing\n" +
+                       $"🛡️ Privacy\n" +
+                       $"💻 Malware\n" +
+                       $"⚠️ Scams\n\n" +
+                       $"Type 'exit' anytime to leave the chat.";
             }
+
+            // Save user message
+            memoryStore.AddConversation($"User: {input}");
+
+            // EXIT OPTIONS
+
+            if (
+                input == "exit" ||
+                input == "quit" ||
+                input == "bye"
+               )
+            {
+                awaitingName = true;
+
+                LastMatchedKeyword = "";
+
+                return $"👋 Chat ended successfully.\n\n" +
+                       $"Welcome back!\n" +
+                       $"What is your name?";
+            }
+
+            // MEMORY QUESTIONS
+
+            if (
+                input.Contains("what is my name") ||
+                input.Contains("do you remember my name") ||
+                input.Contains("who am i")
+               )
+            {
+                return $"😊 Your name is {memoryStore.UserName}.";
+            }
+
+            // FOLLOW-UP QUESTIONS
+
+            if (
+                input.Contains("tell me more") ||
+                input.Contains("another tip") ||
+                input.Contains("explain more") ||
+                input.Contains("continue")
+               )
+            {
+                return $"{memoryStore.UserName},\n\n" +
+                       $"{keywordResponder.GetFollowUpResponse()}";
+            }
+
+            // STORE FAVOURITE TOPIC
+
+            if (input.Contains("interested in"))
+            {
+                foreach (string keyword in keywordResponder.GetAllKeywords())
+                {
+                    if (input.Contains(keyword))
+                    {
+                        memoryStore.FavouriteTopic = keyword;
+
+                        return $"Great, {memoryStore.UserName}! " +
+                               $"I'll remember that you're interested in {keyword}.";
+                    }
+                }
+            }
+
+            // SENTIMENT DETECTION
+
+            Sentiment sentiment =
+                sentimentDetector.Detect(input);
+
+            string sentimentResponse =
+                sentimentDetector.GetSentimentResponse(sentiment);
+
+            string tipResponse =
+                sentimentDetector.GetCybersecurityTip(sentiment);
+
+            // TEST OUTPUT
+            if (sentiment != Sentiment.Neutral)
+            {
+                return
+                    $"Detected Sentiment: {sentiment}\n\n" +
+                    sentimentResponse + "\n\n" +
+                    tipResponse;
+            }
+
+            // SPECIAL QUESTIONS
+
+            if (
+                input.Contains("how are you") ||
+                input.Contains("how are things") ||
+                input.Contains("are you okay")
+               )
+            {
+                return $"😊 I'm functioning perfectly, {memoryStore.UserName}, and ready to help keep you safe online!";
+            }
+
+            if (
+                input.Contains("purpose") ||
+                input.Contains("what is your purpose") ||
+                input.Contains("why were you created")
+               )
+            {
+                return $"🎯 My purpose is to educate users like you, {memoryStore.UserName}, about cybersecurity awareness and online safety.";
+            }
+
+            if (
+                input.Contains("what can you do") ||
+                input.Contains("help me with") ||
+                input.Contains("features")
+               )
+            {
+                return $"💡 {memoryStore.UserName}, I can help with phishing, passwords, scams, malware, privacy, ransomware, VPNs, and online safety tips.";
+            }
+
+            if (
+                input.Contains("who created you") ||
+                input.Contains("who made you")
+               )
+            {
+                return $"👨‍💻 I was created by Erwin Mashobane to help users stay safe online.";
+            }
+
+            if (
+                input.Contains("thank you") ||
+                input.Contains("thanks")
+               )
+            {
+                return $"😊 You're welcome, {memoryStore.UserName}! I'm always here to help.";
+            }
+
+            if (
+                input.Contains("hello") ||
+                input.Contains("hi")
+               )
+            {
+                return $"👋 Hello again, {memoryStore.UserName}! How can I help you today?";
+            }
+
+            // KEYWORD RESPONSES
+
+            string keywordResponse =
+                keywordResponder.GetResponse(input);
+
+            if (!string.IsNullOrEmpty(keywordResponse))
+            {
+                LastMatchedKeyword =
+                    keywordResponder.LastMatchedKeyword;
+
+                string response =
+                    $"{memoryStore.UserName},\n\n" +
+                    sentimentResponse + "\n\n" +
+                    keywordResponse + "\n\n" +
+                    tipResponse;
+
+                memoryStore.AddConversation($"Bot: {response}");
+
+                return response;
+            }
+
+            // SENTIMENT ONLY RESPONSE
+
+            if (sentiment != Sentiment.Neutral)
+            {
+                string response =
+                    $"{memoryStore.UserName},\n\n" +
+                    sentimentResponse + "\n\n" +
+                    tipResponse;
+
+                memoryStore.AddConversation($"Bot: {response}");
+
+                return response;
+            }
+
+            // PERSONALISED FALLBACK
+
+            string fallback =
+                $"{memoryStore.UserName}, " +
+                fallbackResponses[random.Next(fallbackResponses.Count)];
+
+            memoryStore.AddConversation($"Bot: {fallback}");
+
+            return fallback;
         }
     }
 }
-
-
